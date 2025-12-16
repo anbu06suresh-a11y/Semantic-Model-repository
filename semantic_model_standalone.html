@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Model Generator for Power BI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div id="app" class="p-8">
+        <div class="max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <div class="flex items-center justify-center mb-4">
+                    <svg class="w-12 h-12 text-indigo-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                    </svg>
+                    <h1 class="text-4xl font-bold text-gray-800">Semantic Model Generator</h1>
+                </div>
+                <p class="text-gray-600">Upload your data table to automatically generate a semantic model for Power BI</p>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-indigo-500 transition-colors cursor-pointer" id="dropzone">
+                    <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <input type="file" id="fileInput" accept=".csv" class="hidden">
+                    <p class="text-lg text-gray-700 mb-2" id="fileName">Click to upload or drag and drop</p>
+                    <p class="text-sm text-gray-500">CSV files only</p>
+                </div>
+
+                <div id="errorMessage" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-red-700"></p>
+                </div>
+
+                <div id="loadingMessage" class="hidden mt-4 text-center">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <p class="text-gray-600 mt-2">Analyzing data and generating semantic model...</p>
+                </div>
+            </div>
+
+            <!-- Preview Section -->
+            <div id="previewSection" class="hidden bg-white rounded-lg shadow-lg p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                        Preview & Edit Semantic Model
+                    </h2>
+                    <div class="flex gap-3">
+                        <button id="editModeBtn" class="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                            </svg>
+                            Edit Model
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table Name Editor -->
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Table Name</label>
+                    <input type="text" id="tableName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" readonly>
+                </div>
+
+                <!-- Statistics -->
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-600">Total Rows</p>
+                        <p class="text-2xl font-bold text-blue-600" id="totalRows">0</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-600">Total Columns</p>
+                        <p class="text-2xl font-bold text-green-600" id="totalColumns">0</p>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-600">Relationships</p>
+                        <p class="text-2xl font-bold text-purple-600" id="totalRelationships">0</p>
+                    </div>
+                </div>
+
+                <!-- Columns Table -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Columns</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="border border-gray-200 px-4 py-2 text-left">Name</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-left">Data Type</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-left">Nullable</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-left">Description</th>
+                                    <th class="border border-gray-200 px-4 py-2 text-left edit-only hidden">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="columnsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Relationships -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-semibold text-gray-800">Relationships</h3>
+                        <button id="addRelationshipBtn" class="hidden edit-only flex items-center px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            Add Relationship
+                        </button>
+                    </div>
+                    <div id="relationshipsContainer"></div>
+                </div>
+
+                <!-- Download Buttons -->
+                <div class="flex justify-center gap-3 pt-6 border-t">
+                    <button onclick="downloadModel('bim')" class="flex items-center px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-semibold">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Download Power BI (.BIM)
+                    </button>
+                    <button onclick="downloadModel('tmdl')" class="flex items-center px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Download Power BI (.TMDL)
+                    </button>
+                    <button onclick="downloadModel('json')" class="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Download JSON
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let semanticModel = null;
+        let editMode = false;
+
+        // File upload handling
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileUpload);
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('border-indigo-500');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('border-indigo-500');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-indigo-500');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                fileInput.files = files;
+                handleFileUpload({ target: { files } });
+            }
+        });
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            fileName.textContent = file.name;
+            document.getElementById('errorMessage').classList.add('hidden');
+            document.getElementById('loadingMessage').classList.remove('hidden');
+            document.getElementById('previewSection').classList.add('hidden');
+
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: 'greedy',
+                transformHeader: (header) => header.trim(),
+                complete: (results) => {
+                    try {
+                        if (!results.data || results.data.length === 0) {
+                            throw new Error('No data found in CSV file');
+                        }
+                        semanticModel = generateSemanticModel(results, file.name);
+                        renderPreview();
+                        document.getElementById('loadingMessage').classList.add('hidden');
+                        document.getElementById('previewSection').classList.remove('hidden');
+                    } catch (err) {
+                        showError('Error generating semantic model: ' + err.message);
+                    }
+                },
+                error: (err) => {
+                    showError('Error parsing file: ' + err.message);
+                }
+            });
+        }
+
+        function showError(message) {
+            document.getElementById('loadingMessage').classList.add('hidden');
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.querySelector('p').textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function inferDataType(values) {
+            const nonNullValues = values.filter(v => v !== null && v !== undefined && v !== '');
+            if (nonNullValues.length === 0) return 'string';
+
+            const sampleSize = Math.min(100, nonNullValues.length);
+            const sample = nonNullValues.slice(0, sampleSize);
+
+            let allNumbers = true, allIntegers = true, allDates = true, allBooleans = true;
+
+            for (const val of sample) {
+                const str = String(val).trim();
+                if (allBooleans && !['true', 'false', '1', '0', 'yes', 'no'].includes(str.toLowerCase())) {
+                    allBooleans = false;
+                }
+                if (allNumbers && isNaN(Number(str))) {
+                    allNumbers = false;
+                    allIntegers = false;
+                } else if (allIntegers && !Number.isInteger(Number(str))) {
+                    allIntegers = false;
+                }
+                if (allDates && isNaN(Date.parse(str))) {
+                    allDates = false;
+                }
+            }
+
+            if (allBooleans) return 'boolean';
+            if (allIntegers) return 'integer';
+            if (allNumbers) return 'decimal';
+            if (allDates) return 'date';
+            return 'string';
+        }
+
+        function analyzeColumn(columnName, values) {
+            const nonNullValues = values.filter(v => v !== null && v !== undefined && v !== '');
+            const uniqueValues = new Set(nonNullValues);
+
+            return {
+                name: columnName,
+                dataType: inferDataType(values),
+                nullable: nonNullValues.length < values.length,
+                uniqueCount: uniqueValues.size,
+                uniqueRatio: uniqueValues.size / values.length,
+                sampleValues: Array.from(uniqueValues).slice(0, 5)
+            };
+        }
+
+        function detectRelationships(columns) {
+            const relationships = [];
+            columns.forEach(col => {
+                const lowerName = col.name.toLowerCase();
+                if (lowerName.endsWith('_id') || lowerName.endsWith('id')) {
+                    const referencedTable = lowerName.replace(/_?id$/, '');
+                    relationships.push({
+                        type: 'foreign_key',
+                        column: col.name,
+                        referencesTable: referencedTable,
+                        referencesColumn: 'id'
+                    });
+                }
+                if (col.uniqueRatio > 0.95 && col.name.toLowerCase() !== 'id') {
+                    relationships.push({
+                        type: 'unique_identifier',
+                        column: col.name,
+                        description: 'Potential alternate key'
+                    });
+                }
+            });
+            return relationships;
+        }
+
+        function generateSemanticModel(parsedData, filename) {
+            const headers = parsedData.meta.fields || [];
+            const rows = (parsedData.data || []).filter(row => row && Object.keys(row).length > 0);
+
+            if (headers.length === 0) throw new Error('No columns found in CSV file');
+
+            const columns = headers.map(header => {
+                const values = rows.map(row => row && row[header] !== undefined ? row[header] : null);
+                return analyzeColumn(header, values);
+            });
+
+            const relationships = detectRelationships(columns);
+
+            return {
+                tableName: filename.replace(/\.[^/.]+$/, ""),
+                rowCount: rows.length,
+                columns: columns.map(col => ({
+                    name: col.name,
+                    dataType: col.dataType,
+                    nullable: col.nullable,
+                    uniqueValues: col.uniqueCount,
+                    description: `${col.dataType} column with ${col.uniqueCount} unique values`,
+                    sampleValues: col.sampleValues
+                })),
+                relationships: relationships,
+                metadata: {
+                    generatedAt: new Date().toISOString(),
+                    source: filename,
+                    totalColumns: columns.length,
+                    totalRows: rows.length
+                }
+            };
+        }
+
+        function renderPreview() {
+            document.getElementById('tableName').value = semanticModel.tableName;
+            document.getElementById('totalRows').textContent = semanticModel.rowCount;
+            document.getElementById('totalColumns').textContent = semanticModel.columns.length;
+            document.getElementById('totalRelationships').textContent = semanticModel.relationships.length;
+
+            renderColumns();
+            renderRelationships();
+        }
+
+        function renderColumns() {
+            const tbody = document.getElementById('columnsTableBody');
+            tbody.innerHTML = semanticModel.columns.map((col, idx) => `
+                <tr class="hover:bg-gray-50">
+                    <td class="border border-gray-200 px-4 py-2">
+                        ${editMode ? `<input type="text" value="${col.name}" onchange="updateColumn(${idx}, 'name', this.value)" class="w-full px-2 py-1 border border-gray-300 rounded">` : `<span class="font-medium">${col.name}</span>`}
+                    </td>
+                    <td class="border border-gray-200 px-4 py-2">
+                        ${editMode ? `
+                            <select onchange="updateColumn(${idx}, 'dataType', this.value)" class="w-full px-2 py-1 border border-gray-300 rounded">
+                                <option value="string" ${col.dataType === 'string' ? 'selected' : ''}>String</option>
+                                <option value="integer" ${col.dataType === 'integer' ? 'selected' : ''}>Integer</option>
+                                <option value="decimal" ${col.dataType === 'decimal' ? 'selected' : ''}>Decimal</option>
+                                <option value="boolean" ${col.dataType === 'boolean' ? 'selected' : ''}>Boolean</option>
+                                <option value="date" ${col.dataType === 'date' ? 'selected' : ''}>Date</option>
+                            </select>
+                        ` : `<span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">${col.dataType}</span>`}
+                    </td>
+                    <td class="border border-gray-200 px-4 py-2">
+                        ${editMode ? `<input type="checkbox" ${col.nullable ? 'checked' : ''} onchange="updateColumn(${idx}, 'nullable', this.checked)" class="w-4 h-4">` : (col.nullable ? '✓' : '✗')}
+                    </td>
+                    <td class="border border-gray-200 px-4 py-2">
+                        ${editMode ? `<input type="text" value="${col.description}" onchange="updateColumn(${idx}, 'description', this.value)" class="w-full px-2 py-1 border border-gray-300 rounded">` : `<span class="text-sm text-gray-600">${col.description}</span>`}
+                    </td>
+                    <td class="border border-gray-200 px-4 py-2 edit-only ${editMode ? '' : 'hidden'}">
+                        <button onclick="deleteColumn(${idx})" class="text-red-600 hover:text-red-800">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderRelationships() {
+            const container = document.getElementById('relationshipsContainer');
+            if (semanticModel.relationships.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm">No relationships detected</p>';
+                return;
+            }
+
+            container.innerHTML = semanticModel.relationships.map((rel, idx) => `
+                <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-3">
+                    ${editMode ? `
+                        <div class="grid grid-cols-4 gap-3 items-center">
+                            <div>
+                                <label class="text-xs text-gray-600">Type</label>
+                                <select onchange="updateRelationship(${idx}, 'type', this.value)" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                                    <option value="foreign_key" ${rel.type === 'foreign_key' ? 'selected' : ''}>Foreign Key</option>
+                                    <option value="unique_identifier" ${rel.type === 'unique_identifier' ? 'selected' : ''}>Unique Identifier</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">Column</label>
+                                <input type="text" value="${rel.column}" onchange="updateRelationship(${idx}, 'column', this.value)" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">References Table</label>
+                                <input type="text" value="${rel.referencesTable || ''}" onchange="updateRelationship(${idx}, 'referencesTable', this.value)" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                            </div>
+                            <div class="flex items-end">
+                                <button onclick="deleteRelationship(${idx})" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm">Delete</button>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="flex items-center">
+                            <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium mr-3">${rel.type}</span>
+                            <span class="text-gray-700">
+                                <strong>${rel.column}</strong>
+                                ${rel.referencesTable ? ` → references <strong>${rel.referencesTable}.${rel.referencesColumn}</strong>` : ''}
+                                ${rel.description ? ` - ${rel.description}` : ''}
+                            </span>
+                        </div>
+                    `}
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('editModeBtn').addEventListener('click', () => {
+            editMode = !editMode;
+            const btn = document.getElementById('editModeBtn');
+            
+            if (editMode) {
+                btn.innerHTML = `
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Done Editing
+                `;
+                btn.className = 'flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors';
+                document.getElementById('tableName').removeAttribute('readonly');
+                document.querySelectorAll('.edit-only').forEach(el => el.classList.remove('hidden'));
+            } else {
+                btn.innerHTML = `
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                    Edit Model
+                `;
+                btn.className = 'flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors';
+                document.getElementById('tableName').setAttribute('readonly', true);
+                document.querySelectorAll('.edit-only').forEach(el => el.classList.add('hidden'));
+                semanticModel.tableName = document.getElementById('tableName').value;
+            }
+
+            renderColumns();
+            renderRelationships();
+        });
+
+        document.getElementById('addRelationshipBtn').addEventListener('click', () => {
+            semanticModel.relationships.push({
+                type: 'foreign_key',
+                column: '',
+                referencesTable: '',
+                referencesColumn: 'id'
+            });
+            renderRelationships();
+            document.getElementById('totalRelationships').textContent = semanticModel.relationships.length;
+        });
+
+        function updateColumn(idx, field, value) {
+            semanticModel.columns[idx][field] = value;
+        }
+
+        function deleteColumn(idx) {
+            semanticModel.columns.splice(idx, 1);
+            renderColumns();
+            document.getElementById('totalColumns').textContent = semanticModel.columns.length;
+        }
+
+        function updateRelationship(idx, field, value) {
+            semanticModel.relationships[idx][field] = value;
+        }
+
+        function deleteRelationship(idx) {
+            semanticModel.relationships.splice(idx, 1);
+            renderRelationships();
+            document.getElementById('totalRelationships').textContent = semanticModel.relationships.length;
+        }
+
+        function mapToPowerBIDataType(dataType) {
+            const typeMap = {
+                'string': 'String',
+                'integer': 'Int64',
+                'decimal': 'Double',
+                'boolean': 'Boolean',
+                'date': 'DateTime'
+            };
+            return typeMap[dataType] || 'String';
+        }
+
+        function generatePowerBIModel() {
+            return {
+                name: semanticModel.tableName,
+                compatibilityLevel: 1567,
+                model: {
+                    culture: "en-US",
+                    dataSources: [{
+                        type: "structured",
+                        name: `${semanticModel.tableName}_DataSource`,
+                        connectionDetails: {
+                            protocol: "file",
+                            address: { path: semanticModel.metadata.source }
+                        }
+                    }],
+                    tables: [{
+                        name: semanticModel.tableName,
+                        columns: semanticModel.columns.map(col => ({
+                            name: col.name,
+                            dataType: mapToPowerBIDataType(col.dataType),
+                            isNullable: col.nullable,
+                            sourceColumn: col.name,
+                            summarizeBy: col.dataType === 'string' ? 'none' : 'sum',
+                            annotations: [
+                                { name: "SampleValues", value: col.sampleValues.join(', ') },
+                                { name: "Description", value: col.description }
+                            ]
+                        })),
+                        partitions: [{
+                            name: `${semanticModel.tableName}_Partition`,
+                            mode: "import",
+                            source: {
+                                type: "m",
+                                expression: `let\n    Source = Csv.Document(File.Contents("${semanticModel.metadata.source}"),[Delimiter=",", Columns=${semanticModel.columns.length}, Encoding=65001, QuoteStyle=QuoteStyle.None]),\n    #"Promoted Headers" = Table.PromoteHeaders(Source, [PromoteAllScalars=true])\nin\n    #"Promoted Headers"`
+                            }
+                        }],
+                        measures: [],
+                        annotations: [{ name: "RowCount", value: String(semanticModel.rowCount) }]
+                    }],
+                    relationships: semanticModel.relationships
+                        .filter(rel => rel.type === 'foreign_key' && rel.column && rel.referencesTable)
+                        .map((rel, idx) => ({
+                            name: `Relationship_${idx}`,
+                            fromTable: semanticModel.tableName,
+                            fromColumn: rel.column,
+                            toTable: rel.referencesTable,
+                            toColumn: rel.referencesColumn || 'id',
+                            crossFilteringBehavior: "bothDirections",
+                            securityFilteringBehavior: "bothDirections",
+                            isActive: true
+                        })),
+                    annotations: [{ name: "TabularEditor_SerializeOptions", value: JSON.stringify({ IgnoreInferredObjects: true, IgnoreTimestamps: true }) }]
+                }
+            };
+        }
+
+        function generateTMDL() {
+            let tmdl = `model Model\n\tculture: en-US\n\n`;
+            tmdl += `table '${semanticModel.tableName}'\n\tlineageTag: ${Math.random().toString(36).substring(7)}\n\n`;
+            
+            semanticModel.columns.forEach(col => {
+                tmdl += `\tcolumn '${col.name}'\n`;
+                tmdl += `\t\tdataType: ${mapToPowerBIDataType(col.dataType).toLowerCase()}\n`;
+                tmdl += `\t\tisNullable: ${col.nullable}\n`;
+                tmdl += `\t\tformatString: ${col.dataType === 'date' ? 'General Date' : '0'}\n`;
+                tmdl += `\t\tsourceColumn: ${col.name}\n`;
+                tmdl += `\t\tsummarizeBy: ${col.dataType === 'string' ? 'none' : 'sum'}\n\n`;
+            });
+            
+            tmdl += `\tpartition '${semanticModel.tableName}'\n\t\tmode: import\n\t\tsource\n\t\t\ttype: m\n\t\t\texpression: |\n`;
+            tmdl += `\t\t\t\tlet\n\t\t\t\t    Source = Csv.Document(File.Contents("${semanticModel.metadata.source}"),[Delimiter=",", Columns=${semanticModel.columns.length}]),\n`;
+            tmdl += `\t\t\t\t    #"Promoted Headers" = Table.PromoteHeaders(Source)\n\t\t\t\tin\n\t\t\t\t    #"Promoted Headers"\n\n`;
+
+            semanticModel.relationships
+                .filter(rel => rel.type === 'foreign_key' && rel.column && rel.referencesTable)
+                .forEach((rel, idx) => {
+                    tmdl += `relationship Relationship${idx}\n`;
+                    tmdl += `\tfromColumn: '${semanticModel.tableName}'.'${rel.column}'\n`;
+                    tmdl += `\ttoColumn: '${rel.referencesTable}'.'${rel.referencesColumn || 'id'}'\n`;
+                    tmdl += `\tcrossFilteringBehavior: bothDirections\n\n`;
+                });
+
+            return tmdl;
+        }
+
+        function downloadModel(format) {
+            if (!semanticModel) return;
+
+            let content, filename, mimeType;
+
+            if (format === 'bim') {
+                const bimModel = generatePowerBIModel();
+                content = JSON.stringify(bimModel, null, 2);
+                filename = `${semanticModel.tableName}.bim`;
+                mimeType = 'application/json';
+            } else if (format === 'tmdl') {
+                content = generateTMDL();
+                filename = `${semanticModel.tableName}.tmdl`;
+                mimeType = 'text/plain';
+            } else if (format === 'json') {
+                content = JSON.stringify(semanticModel, null, 2);
+                filename = `${semanticModel.tableName}_semantic_model.json`;
+                mimeType = 'application/json';
+            }
+
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
